@@ -130,6 +130,7 @@
         <button onclick="addTemplate()" style="background-color: #6c757d;">Add Template</button>
     </div>
     <button onclick="sortBanks()">Sort by Rate</button>
+    <button onclick="downloadRates()">Download Rates as rates.txt</button>
 
     <script>
         let banks = [];
@@ -218,6 +219,9 @@
             selectedBankIndex = index;
             document.getElementById('htmlInput').value = banks[index];
             updateEditStatus();
+
+            const inputArea = document.getElementById('inputArea');
+            inputArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function updateBank() {
@@ -255,6 +259,22 @@
                 return rateB - rateA;
             });
             renderBanks();
+        }
+
+        function downloadRates() {
+            const ratesContent = banks.join('\n');
+
+            // Create a blob with the content
+            const blob = new Blob([ratesContent], { type: 'text/plain' });
+
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'rates.txt';
+
+            document.body.appendChild(link);
+            link.click();
+
+            document.body.removeChild(link);
         }
 
         loadBanks();
