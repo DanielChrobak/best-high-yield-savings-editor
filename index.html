@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Rates Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4a4a4a;
+            margin-bottom: 20px;
+        }
+
+        #bankList {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #bankList li {
+            background-color: #fff;
+            margin-bottom: 5px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        #bankList li .bank-info {
+            flex-grow: 1;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        #bankList li .bank-info a {
+            text-decoration: none;
+            color: #0066cc;
+        }
+
+        #bankList li .bank-info a:hover {
+            text-decoration: underline;
+        }
+
+        #bankList li .button-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        #bankList li button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 12px;
+        }
+
+        #bankList li button:hover {
+            background-color: #0056b3;
+        }
+
+        #inputArea {
+            margin-top: 20px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #cancelEditButton {
+            background-color: #dc3545;
+        }
+
+        #cancelEditButton:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bank Rates Manager</h1>
+    <ul id="bankList"></ul>
+    <div id="inputArea">
+        <h2>Add/Edit Bank</h2>
+        <p id="editStatus" style="color: #666; font-size: 14px; margin-bottom: 10px;">Not editing any bank</p>
+        <textarea id="htmlInput" placeholder="Enter HTML content here..."></textarea>
+        <button onclick="addBank()">Add Bank</button>
+        <button onclick="updateBank()">Update Selected Bank</button>
+        <button id="cancelEditButton" onclick="cancelEdit()">Cancel Editing</button>
+        <button onclick="addTemplate()" style="background-color: #6c757d;">Add Template</button>
+    </div>
+    <button onclick="sortBanks()">Sort by Rate</button>
+
+    <script>
+        let banks = [];
+        let selectedBankIndex = -1;
+
+        function saveBanks() {
+            localStorage.setItem('banks', JSON.stringify(banks));
+        }
+
+        function loadBanks() {
+            const savedBanks = localStorage.getItem('banks');
+            if (savedBanks) {
+                banks = JSON.parse(savedBanks);
+            }
+        }
+
+        function updateEditStatus() {
+            const editStatus = document.getElementById('editStatus');
+            if (selectedBankIndex !== -1) {
+                const match = banks[selectedBankIndex].match(/<a [^>]*>([^<]*)<\/a>/);
+                const bankName = match ? match[1] : `Bank #${selectedBankIndex + 1}`;
+                editStatus.textContent = `Editing ${bankName}`;
+            } else {
+                editStatus.textContent = 'Not editing any bank';
+            }
+        }
+
+        function addTemplate() {
+            if (selectedBankIndex === -1) {
+                const template = '<li><a href="BANK_URL">BANK_NAME</a> – 0.00% ACCOUNT_TYPE (REQUIREMENTS)</li>';
+                document.getElementById('htmlInput').value = template;
+            } else {
+                alert("You are currently editing a bank. Please update or cancel editing before adding a template.");
+            }
+        }
+
+        function renderBanks() {
+            const list = document.getElementById('bankList');
+            list.innerHTML = '';
+            banks.forEach((bank, index) => {
+                const li = document.createElement('li');
+
+                const bankInfo = document.createElement('div');
+                bankInfo.className = 'bank-info';
+
+                let cleanBank = bank.replace(/<\/li>/g, '').trim();
+                bankInfo.innerHTML = cleanBank;
+
+                li.appendChild(bankInfo);
+
+                const buttonGroup = document.createElement('div');
+                buttonGroup.className = 'button-group';
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.onclick = () => editBank(index);
+                buttonGroup.appendChild(editButton);
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.onclick = () => removeBank(index);
+                buttonGroup.appendChild(removeButton);
+
+                li.appendChild(buttonGroup);
+                list.appendChild(li);
+            });
+            saveBanks();
+        }
+
+        function addBank() {
+            const htmlInput = document.getElementById('htmlInput');
+            if (htmlInput.value.trim()) {
+                const newBanks = htmlInput.value.trim().split('</li>');
+                newBanks.forEach(bank => {
+                    if (bank.trim()) {
+                        banks.push(bank.trim() + '</li>');
+                    }
+                });
+                htmlInput.value = '';
+                renderBanks();
+                updateEditStatus();
+            }
+        }
+
+        function editBank(index) {
+            selectedBankIndex = index;
+            document.getElementById('htmlInput').value = banks[index];
+            updateEditStatus();
+        }
+
+        function updateBank() {
+            if (selectedBankIndex !== -1) {
+                const htmlInput = document.getElementById('htmlInput');
+                banks[selectedBankIndex] = htmlInput.value.trim();
+                htmlInput.value = '';
+                selectedBankIndex = -1;
+                renderBanks();
+                updateEditStatus();
+            } else {
+                alert("No bank selected for updating.");
+            }
+        }
+
+        function cancelEdit() {
+            selectedBankIndex = -1;
+            document.getElementById('htmlInput').value = '';
+            updateEditStatus();
+        }
+
+        function removeBank(index) {
+            banks.splice(index, 1);
+            renderBanks();
+            if (selectedBankIndex === index) {
+                selectedBankIndex = -1;
+            }
+            updateEditStatus();
+        }
+
+        function sortBanks() {
+            banks.sort((a, b) => {
+                const rateA = parseFloat(a.match(/(\d+\.\d+)%/)[1]);
+                const rateB = parseFloat(b.match(/(\d+\.\d+)%/)[1]);
+                return rateB - rateA;
+            });
+            renderBanks();
+        }
+
+        loadBanks();
+        renderBanks();
+        updateEditStatus();
+    </script>
+</body>
+</html>
