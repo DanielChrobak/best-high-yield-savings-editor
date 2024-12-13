@@ -131,6 +131,7 @@
     </div>
     <button onclick="sortBanks()">Sort by Rate</button>
     <button onclick="downloadRates()">Download Rates as rates.txt</button>
+    <button onclick="clearAllBanks()" style="background-color: #dc3545;">Clear All Banks</button>
 
     <script>
         let banks = [];
@@ -144,6 +145,17 @@
             const savedBanks = localStorage.getItem('banks');
             if (savedBanks) {
                 banks = JSON.parse(savedBanks);
+            }
+        }
+
+        function clearAllBanks() {
+            if (confirm("Are you sure you want to clear all banks? This action cannot be undone.")) {
+                banks = [];
+                localStorage.removeItem('banks');
+                renderBanks();
+                selectedBankIndex = -1;
+                updateEditStatus();
+                document.getElementById('htmlInput').value = '';
             }
         }
 
