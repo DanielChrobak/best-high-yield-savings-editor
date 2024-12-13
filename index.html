@@ -31,7 +31,7 @@
             justify-content: space-between;
             align-items: center;
             font-size: 14px;
-            max-height: 20px; /* Set a maximum height */
+            max-height: 15px; /* Set a maximum height */
             overflow: hidden;  /* Prevent content from overflowing */
         }
 
@@ -148,6 +148,9 @@
             const bankListItems = document.getElementById('bankList').getElementsByTagName('li');
             let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">';
             content += '<head><meta charset="utf-8"><title>Bank Rates</title></head><body>';
+            
+            // Start unordered list
+            content += '<ul>';
 
             const uniqueEntries = new Set();
 
@@ -155,9 +158,13 @@
                 let bankInfo = item.querySelector('.bank-info')?.innerHTML || ''; 
                 if (bankInfo.trim() && !uniqueEntries.has(bankInfo)) {
                     uniqueEntries.add(bankInfo);
-                    content += '<p>' + bankInfo + '</p>';
+                    // Add each item as a list item
+                    content += '<li>' + bankInfo + '</li>';
                 }
             }
+
+            // Close unordered list
+            content += '</ul>';
 
             content += '</body></html>';
 
