@@ -130,9 +130,9 @@
         <button onclick="addTemplate()" style="background-color: #6c757d;">Add Template</button>
     </div>
     <button onclick="sortBanks()">Sort by Rate</button>
-    <button onclick="downloadRates()">Download Rates as rates.txt</button>
+    <button id="downloadButton">Download as Word Document</button>
     <button onclick="clearAllBanks()" style="background-color: #dc3545;">Clear All Banks</button>
-
+    
     <script>
         let banks = [];
         let selectedBankIndex = -1;
@@ -178,6 +178,33 @@
                 alert("You are currently editing a bank. Please update or cancel editing before adding a template.");
             }
         }
+
+        document.getElementById('downloadButton').addEventListener('click', () => {
+            const bankListItems = document.getElementById('bankList').getElementsByTagName('li');
+            let content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">';
+            content += '<head><meta charset="utf-8"><title>Bank Rates</title></head><body>';
+
+            const uniqueEntries = new Set();
+
+            for (let item of bankListItems) {
+                let bankInfo = item.querySelector('.bank-info')?.innerHTML || ''; 
+                if (bankInfo.trim() && !uniqueEntries.has(bankInfo)) {
+                    uniqueEntries.add(bankInfo);
+                    content += '<p>' + bankInfo + '</p>';
+                }
+            }
+
+            content += '</body></html>';
+
+            const blob = new Blob([content], { type: 'application/msword' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'BankRates.doc';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
 
         function renderBanks() {
             const list = document.getElementById('bankList');
@@ -271,22 +298,6 @@
                 return rateB - rateA;
             });
             renderBanks();
-        }
-
-        function downloadRates() {
-            const ratesContent = banks.join('\n');
-
-            // Create a blob with the content
-            const blob = new Blob([ratesContent], { type: 'text/plain' });
-
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'rates.txt';
-
-            document.body.appendChild(link);
-            link.click();
-
-            document.body.removeChild(link);
         }
 
         loadBanks();
