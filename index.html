@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank Rates Manager</title>
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -20,11 +21,6 @@
             margin-bottom: 20px;
         }
 
-        #bankList {
-            list-style-type: none;
-            padding: 0;
-        }
-
         #bankList li {
             background-color: #fff;
             margin-bottom: 5px;
@@ -35,6 +31,8 @@
             justify-content: space-between;
             align-items: center;
             font-size: 14px;
+            max-height: 20px; /* Set a maximum height */
+            overflow: hidden;  /* Prevent content from overflowing */
         }
 
         #bankList li .bank-info {
@@ -43,16 +41,8 @@
             display: flex;
             align-items: center;
             white-space: nowrap;
-            overflow: hidden;
-        }
-
-        #bankList li .bank-info a {
-            text-decoration: none;
-            color: #0066cc;
-        }
-
-        #bankList li .bank-info a:hover {
-            text-decoration: underline;
+            overflow: hidden;  /* Ensure that long content does not stretch the item */
+            text-overflow: ellipsis; /* Add ellipsis for overflowed text */
         }
 
         #bankList li .button-group {
@@ -83,14 +73,8 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        textarea {
-            width: 100%;
-            height: 100px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-            font-size: 14px;
+        .ql-editor {
+            min-height: 100px;
         }
 
         button {
@@ -115,6 +99,7 @@
         #cancelEditButton:hover {
             background-color: #c82333;
         }
+
     </style>
 </head>
 <body>
@@ -123,19 +108,24 @@
     <div id="inputArea">
         <h2>Add/Edit Bank</h2>
         <p id="editStatus" style="color: #666; font-size: 14px; margin-bottom: 10px;">Not editing any bank</p>
-        <textarea id="htmlInput" placeholder="Enter HTML content here..."></textarea>
-        <button onclick="addBank()">Add Bank</button>
+        <label for="bankDetails">Bank Details</label>
+        <div id="bankEditor" style="border: 1px solid #ddd; border-radius: 5px;"></div>
+
+        <button onclick="addBanks()">Add Bank(s)</button>
         <button onclick="updateBank()">Update Selected Bank</button>
         <button id="cancelEditButton" onclick="cancelEdit()">Cancel Editing</button>
-        <button onclick="addTemplate()" style="background-color: #6c757d;">Add Template</button>
     </div>
     <button onclick="sortBanks()">Sort by Rate</button>
     <button id="downloadButton">Download as Word Document</button>
     <button onclick="clearAllBanks()" style="background-color: #dc3545;">Clear All Banks</button>
-    
+
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <script>
         let banks = [];
         let selectedBankIndex = -1;
+        const quill = new Quill('#bankEditor', {
+            theme: 'snow'
+        });
 
         function saveBanks() {
             localStorage.setItem('banks', JSON.stringify(banks));
@@ -148,35 +138,10 @@
             }
         }
 
-        function clearAllBanks() {
-            if (confirm("Are you sure you want to clear all banks? This action cannot be undone.")) {
-                banks = [];
-                localStorage.removeItem('banks');
-                renderBanks();
-                selectedBankIndex = -1;
-                updateEditStatus();
-                document.getElementById('htmlInput').value = '';
-            }
-        }
-
-        function updateEditStatus() {
-            const editStatus = document.getElementById('editStatus');
-            if (selectedBankIndex !== -1) {
-                const match = banks[selectedBankIndex].match(/<a [^>]*>([^<]*)<\/a>/);
-                const bankName = match ? match[1] : `Bank #${selectedBankIndex + 1}`;
-                editStatus.textContent = `Editing ${bankName}`;
-            } else {
-                editStatus.textContent = 'Not editing any bank';
-            }
-        }
-
-        function addTemplate() {
-            if (selectedBankIndex === -1) {
-                const template = '<li><a href="BANK_URL">BANK_NAME</a> – 0.00% ACCOUNT_TYPE (REQUIREMENTS)</li>';
-                document.getElementById('htmlInput').value = template;
-            } else {
-                alert("You are currently editing a bank. Please update or cancel editing before adding a template.");
-            }
+        function cancelEdit() {
+            selectedBankIndex = -1;
+            quill.setContents([]);
+            updateEditStatus();
         }
 
         document.getElementById('downloadButton').addEventListener('click', () => {
@@ -205,6 +170,25 @@
             document.body.removeChild(link);
         });
 
+        function clearAllBanks() {
+            if (confirm("Are you sure you want to clear all banks? This action cannot be undone.")) {
+                banks = [];
+                localStorage.removeItem('banks');
+                renderBanks();
+                selectedBankIndex = -1;
+                updateEditStatus();
+                quill.setContents([]);
+            }
+        }
+
+        function updateEditStatus() {
+            const editStatus = document.getElementById('editStatus');
+            if (selectedBankIndex !== -1) {
+                editStatus.textContent = `Editing bank entry`;
+            } else {
+                editStatus.textContent = 'Not editing any bank';
+            }
+        }
 
         function renderBanks() {
             const list = document.getElementById('bankList');
@@ -214,9 +198,7 @@
 
                 const bankInfo = document.createElement('div');
                 bankInfo.className = 'bank-info';
-
-                let cleanBank = bank.replace(/<\/li>/g, '').trim();
-                bankInfo.innerHTML = cleanBank;
+                bankInfo.innerHTML = bank.details;
 
                 li.appendChild(bankInfo);
 
@@ -239,48 +221,87 @@
             saveBanks();
         }
 
-        function addBank() {
-            const htmlInput = document.getElementById('htmlInput');
-            if (htmlInput.value.trim()) {
-                const newBanks = htmlInput.value.trim().split('</li>');
-                newBanks.forEach(bank => {
-                    if (bank.trim()) {
-                        banks.push(bank.trim() + '</li>');
-                    }
+        function addBanks() {
+            const details = quill.root.innerHTML.trim();
+
+            if (details) {
+                const banksToAdd = details.split('<div class="ql-editor">').map(bankDetail => {
+                    const cleanedBankDetail = bankDetail.trim().replace('</div>', '').trim();
+                    return cleanedBankDetail;
+                }).filter(bankDetail => bankDetail !== '');
+
+                banksToAdd.forEach(bankDetail => {
+                    banks.push({ details: bankDetail });
                 });
-                htmlInput.value = '';
+                quill.setContents([]);
                 renderBanks();
-                updateEditStatus();
+            } else {
+                alert("Please provide bank details.");
             }
-        }
-
-        function editBank(index) {
-            selectedBankIndex = index;
-            document.getElementById('htmlInput').value = banks[index];
-            updateEditStatus();
-
-            const inputArea = document.getElementById('inputArea');
-            inputArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function updateBank() {
             if (selectedBankIndex !== -1) {
-                const htmlInput = document.getElementById('htmlInput');
-                banks[selectedBankIndex] = htmlInput.value.trim();
-                htmlInput.value = '';
-                selectedBankIndex = -1;
-                renderBanks();
-                updateEditStatus();
+                // Get the updated details from the editor
+                const updatedDetails = quill.root.innerHTML.trim();
+
+                if (updatedDetails) {
+                    // Update the bank details
+                    banks[selectedBankIndex].details = updatedDetails;
+                    quill.setContents([]); // Clear the editor after updating
+
+                    // Re-render the list of banks to reflect the change
+                    renderBanks();
+                    selectedBankIndex = -1; // Clear selection after update
+                    updateEditStatus(); // Update the edit status
+                } else {
+                    alert("Please provide updated bank details.");
+                }
             } else {
                 alert("No bank selected for updating.");
             }
         }
 
-        function cancelEdit() {
-            selectedBankIndex = -1;
-            document.getElementById('htmlInput').value = '';
+        function editBank(index) {
+            selectedBankIndex = index;
+            const bank = banks[index];
+
+            const cleanedDetails = bank.details
+                .replace(/<\/?p>/g, ' ')        // Replace <p> tags with a space
+                .replace(/<\/?div>/g, ' ')      // Replace <div> tags with a space
+                .replace(/<br>/g, ' ')          // Replace <br> with a space to avoid line breaks
+                .replace(/&nbsp;/g, ' ')        // Replace non-breaking space with a regular space
+                .replace(/\n/g, ' ')            // Replace newlines with spaces
+                .replace(/\s+/g, ' ')           // Replace multiple spaces with a single space
+                .trim();                        // Trim any extra spaces at the beginning and end
+
+            quill.clipboard.dangerouslyPasteHTML(cleanedDetails);
+
             updateEditStatus();
         }
+
+        function addBanks() {
+            const details = quill.root.innerHTML.trim();
+
+            if (details) {
+                // Use a regular expression to extract all <li> items as separate bank entries
+                const banksToAdd = details.match(/<li>.*?<\/li>/g);
+
+                if (banksToAdd) {
+                    banksToAdd.forEach(bankDetail => {
+                        const cleanedBankDetail = bankDetail.replace(/<\/?li>/g, '').trim(); // Clean the <li> tags
+                        banks.push({ details: cleanedBankDetail });
+                    });
+                    quill.setContents([]);  // Clear the editor
+                    renderBanks();  // Re-render the list
+                } else {
+                    alert("Please provide bank details in a list format.");
+                }
+            } else {
+                alert("Please provide bank details.");
+            }
+        }
+
 
         function removeBank(index) {
             banks.splice(index, 1);
@@ -292,11 +313,19 @@
         }
 
         function sortBanks() {
-            banks.sort((a, b) => {
-                const rateA = parseFloat(a.match(/(\d+\.\d+)%/)[1]);
-                const rateB = parseFloat(b.match(/(\d+\.\d+)%/)[1]);
-                return rateB - rateA;
-            });
+            // Function to extract the rate from the bank details (assumes the rate is always at the end of the string)
+            function extractRate(details) {
+                const rateMatch = details.match(/(\d+(\.\d+)?)%/);
+                if (rateMatch) {
+                    return parseFloat(rateMatch[1]); // Return the rate as a number
+                }
+                return 0; // Return 0 if no rate is found
+            }
+
+            // Sort banks based on the extracted rate
+            banks.sort((a, b) => extractRate(b.details) - extractRate(a.details));
+
+            // Re-render the sorted list
             renderBanks();
         }
 
